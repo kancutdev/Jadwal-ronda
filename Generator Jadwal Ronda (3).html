@@ -1,0 +1,1952 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Generator Jadwal Ronda</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS CDN untuk Ekspor Multi-sheet Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF CDN untuk Pembuatan File PDF Vektor Landscape (Anti-Kosong) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- PDF.js CDN untuk Ekstraksi & Parsing File PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+              950: '#052e16',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @media print {
+      @page {
+        size: landscape;
+        margin: 6mm;
+      }
+      body {
+        background-color: white !important;
+        color: black !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      #viewSchedule {
+        display: block !important;
+      }
+      #viewRekap {
+        display: none !important;
+      }
+      #scheduleCardsContainer {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 6px !important;
+      }
+      .page-break-avoid {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+    .print-only {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Header Cetak Khusus Print / PDF -->
+  <div class="print-only p-6 border-b-2 border-slate-800 text-center mb-6">
+    <h1 class="text-2xl font-black uppercase tracking-wider text-black">JADWAL RONDA MALAM</h1>
+    <p class="text-sm text-slate-700 font-medium mt-1" id="printSubTitle">Jadwal Ronda Mingguan Warga</p>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+    
+    <!-- Top Header Banner (No-Print) -->
+    <header class="no-print bg-gradient-to-r from-brand-900 via-brand-800 to-brand-900 text-white rounded-2xl shadow-md p-5 sm:p-6 mb-6 border border-brand-700/50">
+      <h1 class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight uppercase">
+        GENERATOR JADWAL RONDA
+      </h1>
+    </header>
+
+    <!-- Control & Setting Card (No-Print) -->
+    <div class="no-print bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-7 mb-6">
+      
+      <!-- Zona Upload File Warga (Metode Input Utama) -->
+      <div id="topDropZone" class="mb-6 p-4 sm:p-5 rounded-xl border-2 border-dashed border-brand-400 bg-brand-50/50 hover:bg-brand-50 hover:border-brand-600 transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-brand-700 text-white flex items-center justify-center text-2xl shrink-0 shadow-sm">
+            📂
+          </div>
+          <div>
+            <div class="text-sm sm:text-base font-extrabold text-brand-950 flex flex-wrap items-center gap-2">
+              <span>Input Data Warga Lewat File (CSV, TXT, PDF, XLSX)</span>
+              <span id="activeFileBadge" class="hidden text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">✓ File Terpasang</span>
+            </div>
+            <div id="fileUploadPromptText" class="text-xs text-brand-800 mt-0.5">
+              Tarik & lepas file ke sini atau klik "Pilih File" untuk memasukkan daftar warga (Blok & Nama).
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" onclick="triggerFileUpload()" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-brand-700 hover:bg-brand-800 text-white transition shadow-sm cursor-pointer whitespace-nowrap">
+            📤 Pilih File
+          </button>
+          <button type="button" onclick="openFormatHelpModal()" class="px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white border border-brand-300 hover:bg-brand-100/70 text-brand-900 transition cursor-pointer" title="Lihat Contoh Format File">
+            ℹ️ Contoh Format
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
+        
+        <!-- Pilihan Tanggal Mulai -->
+        <div>
+          <label for="startDateInput" class="block text-xs font-bold uppercase tracking-wider text-brand-900 mb-2">
+            Tanggal Mulai Ronda (Harus Hari Sabtu)
+          </label>
+          <input type="date" id="startDateInput" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600 transition bg-slate-50 hover:bg-white">
+          <p class="text-xs text-slate-500 mt-1.5" id="startDateFeedback">Otomatis dialihkan ke hari Sabtu terdekat.</p>
+        </div>
+
+        <!-- Pilihan Durasi / Jumlah Periode -->
+        <div>
+          <label for="periodSelect" class="block text-xs font-bold uppercase tracking-wider text-brand-900 mb-2">
+            Periode / Jumlah Putaran Ronda
+          </label>
+          <select id="periodSelect" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-brand-600 transition bg-slate-50 hover:bg-white">
+            <option value="12" id="optCycle1" selected>1 Putaran Penuh</option>
+            <option value="24" id="optCycle2">2 Putaran Penuh</option>
+            <option value="36" id="optCycle3">3 Putaran Penuh</option>
+            <option value="custom">Kustom Jumlah Minggu...</option>
+          </select>
+          <input type="number" id="customPeriodInput" min="1" max="104" placeholder="Masukkan jumlah minggu" class="hidden mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-medium">
+        </div>
+
+        <!-- Maksimal Peserta Per Minggu -->
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-brand-900 mb-2">
+            Kapasitas Peserta / Sabtu
+          </label>
+          <div class="flex items-center gap-2">
+            <input type="number" value="8" readonly class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2.5 text-sm font-bold text-slate-600 cursor-not-allowed">
+            <span class="text-xs text-slate-500 whitespace-nowrap">Maksimal 8 org/minggu</span>
+          </div>
+          <p class="text-xs text-emerald-600 font-medium mt-1.5">✓ Rumah Kosong: Minggu 11 & 12 masing-masing 2, minggu lainnya dibagi rata (1–2 per minggu).</p>
+        </div>
+
+      </div>
+
+      <!-- Tombol Utama Acak -->
+      <button id="btnAutoAcak" type="button" class="w-full group relative flex items-center justify-center gap-3 bg-gradient-to-r from-brand-700 via-brand-600 to-brand-800 hover:from-brand-800 hover:to-brand-900 active:scale-[0.99] text-white py-4 px-6 rounded-xl font-black text-lg sm:text-xl tracking-wide shadow-lg shadow-brand-700/25 transition-all duration-200 cursor-pointer">
+        <svg class="w-6 h-6 transform group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        🔀 AUTO ACAK JADWAL RONDA
+      </button>
+
+      <!-- Panel Metrik Validasi Real-time -->
+      <div class="mt-6 pt-5 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+          <span class="text-[11px] font-bold uppercase text-slate-500 block">Status Bentrok Blok</span>
+          <div id="statConflictBadge" class="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+            ✓ 0 BENTROK (VALID)
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+          <span class="text-[11px] font-bold uppercase text-slate-500 block">Warga Terjadwal</span>
+          <span id="statScheduledCount" class="text-base sm:text-lg font-black text-slate-800 mt-1 block">0 Warga</span>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+          <span class="text-[11px] font-bold uppercase text-slate-500 block">Total Minggu Ronda</span>
+          <span id="statWeeksCount" class="text-base sm:text-lg font-black text-slate-800 mt-1 block">0 Minggu</span>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+          <span class="text-[11px] font-bold uppercase text-slate-500 block">Distribusi Giliran</span>
+          <span id="statTurnBalance" class="text-base sm:text-lg font-black text-brand-700 mt-1 block">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar Ekspor & Filter (No-Print) -->
+    <div class="no-print flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
+      
+      <!-- Navigasi Tabs -->
+      <div class="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl">
+        <button id="tabBtnSchedule" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition bg-white text-brand-900 shadow-sm" data-target="viewSchedule">
+          📅 Jadwal Mingguan
+        </button>
+        <button id="tabBtnRekap" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition text-slate-600 hover:text-slate-900" data-target="viewRekap">
+          📊 Rekap Giliran Warga
+        </button>
+      </div>
+
+      <!-- Tombol Ekspor Lengkap -->
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btnExportExcel" type="button" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-brand-800 hover:bg-brand-900 text-white transition shadow-sm cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          Unduh Excel (.xlsx)
+        </button>
+        <button id="btnExportCSV" type="button" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 transition shadow-sm cursor-pointer">
+          Unduh CSV
+        </button>
+        <button id="btnDownloadPDF" type="button" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-rose-700 hover:bg-rose-800 text-white transition shadow-sm cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+          <span id="btnPdfText">📥 Unduh PDF</span>
+        </button>
+        <button id="btnPrint" type="button" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 transition shadow-sm cursor-pointer">
+          🖨️ Cetak Jadwal
+        </button>
+      </div>
+
+    </div>
+
+    <!-- VIEW 1: Grid Kartu Jadwal Ronda Mingguan -->
+    <div id="viewSchedule" class="tab-view block">
+      <div id="scheduleCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Kartu per minggu akan dirender secara dinamis oleh JavaScript -->
+      </div>
+    </div>
+
+    <!-- VIEW 2: Rekapitulasi Giliran Warga -->
+    <div id="viewRekap" class="tab-view hidden">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row gap-3 justify-between sm:items-center bg-slate-50/50">
+          <div>
+            <h3 class="font-black text-slate-800 text-lg">Rekapitulasi Giliran Ronda Warga</h3>
+            <p class="text-xs text-slate-500">Memastikan pembagian giliran merata dan adil untuk seluruh data warga dari file.</p>
+          </div>
+          <div class="w-full sm:w-72">
+            <input type="text" id="rekapSearchInput" placeholder="Cari nama atau nomor blok..." class="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-600">
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-100 text-slate-600 text-[11px] uppercase tracking-wider font-extrabold border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4 w-12 text-center">No</th>
+                <th class="py-3 px-4 w-28">Blok</th>
+                <th class="py-3 px-4">Nama Warga</th>
+                <th class="py-3 px-4 w-32 text-center">Total Giliran</th>
+                <th class="py-3 px-4">Jadwal Minggu Bertugas</th>
+              </tr>
+            </thead>
+            <tbody id="rekapTableBody" class="divide-y divide-slate-100 font-medium">
+              <!-- Render via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Konfirmasi Hapus Jadwal Warga -->
+    <div id="deleteConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+      <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden p-6 text-center">
+        <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+          ⚠️
+        </div>
+        <h4 class="font-black text-slate-900 text-base sm:text-lg mb-1">Konfirmasi Penghapusan</h4>
+        <p id="deleteConfirmText" class="text-xs text-slate-500 mb-6">Tindakan ini akan mempengaruhi jadwal ronda yang aktif.</p>
+        <div class="flex gap-2 justify-center">
+          <button id="btnCancelDelete" type="button" class="flex-1 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+            Batal
+          </button>
+          <button id="btnConfirmDelete" type="button" class="flex-1 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm">
+            Ya, Lanjutkan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Edit / Tukar Jadwal Ronda Per Minggu -->
+    <div id="swapScheduleModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+      <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div class="p-5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+          <div>
+            <h4 class="font-extrabold text-slate-800 text-base sm:text-lg">Tukar / Ganti Jadwal Warga</h4>
+            <p id="swapModalSubTitle" class="text-xs text-slate-500">Pindahkan atau tukar giliran ronda jika warga berhalangan.</p>
+          </div>
+          <button id="btnCloseSwapModal" type="button" class="text-slate-400 hover:text-slate-600 font-bold text-lg p-1">&times;</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <!-- Info Warga Saat Ini -->
+          <div class="p-3 bg-brand-50 border border-brand-200 rounded-xl flex items-center justify-between">
+            <div>
+              <span class="text-[10px] font-extrabold text-brand-700 uppercase">Warga Asal:</span>
+              <div id="swapSourceResident" class="text-sm font-black text-brand-950">-</div>
+            </div>
+            <div id="swapSourceWeekBadge" class="text-xs font-bold px-2.5 py-1 bg-white text-brand-800 border border-brand-300 rounded-lg">
+              Minggu -
+            </div>
+          </div>
+
+          <!-- Pilihan Target Tukar -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+              Tukar Dengan Warga di Minggu Lain:
+            </label>
+            <select id="swapTargetSelect" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-600">
+              <!-- Opsi daftar warga minggu lain dimasukkan via JS -->
+            </select>
+            <span id="swapValidationWarning" class="text-[11px] text-amber-600 font-medium mt-1.5 block hidden">
+              ⚠️ Peringatan: Penukaran ini berpotensi menyebabkan nomor blok yang sama dalam satu minggu!
+            </span>
+          </div>
+
+          <div class="pt-3 flex gap-2 justify-end border-t border-slate-100">
+            <button id="btnCancelSwap" type="button" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+              Batal
+            </button>
+            <button id="btnConfirmSwap" type="button" class="px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-brand-800 hover:bg-brand-900 text-white transition shadow-sm">
+              ⇄ Terapkan Penukaran
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden Input File untuk Upload Universal -->
+    <input type="file" id="globalFileInput" accept=".csv, .txt, .pdf, .xlsx, .xls" class="hidden">
+
+    <!-- Modal Konfirmasi & Pratinjau Hasil Unggah File -->
+    <div id="uploadPreviewModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+      <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
+        <div class="p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+          <div>
+            <h4 class="font-extrabold text-slate-800 text-base sm:text-lg">Konfirmasi Hasil Impor File</h4>
+            <p id="uploadPreviewFileName" class="text-xs text-brand-800 font-semibold mt-0.5">Nama File: -</p>
+          </div>
+          <button type="button" onclick="closeUploadPreviewModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg p-1">&times;</button>
+        </div>
+
+        <div class="p-5 space-y-4 overflow-y-auto flex-1">
+          <!-- Kartu Ringkasan Hasil Parsing -->
+          <div class="grid grid-cols-3 gap-3">
+            <div class="p-3 bg-brand-50 border border-brand-200 rounded-xl text-center">
+              <span class="text-[10px] font-bold text-brand-800 uppercase block">Total Warga Ditemukan</span>
+              <span id="previewCountTotal" class="text-lg sm:text-xl font-black text-brand-950">0</span>
+            </div>
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+              <span class="text-[10px] font-bold text-amber-800 uppercase block">Rumah Kosong</span>
+              <span id="previewCountEmpty" class="text-lg sm:text-xl font-black text-amber-950">0</span>
+            </div>
+            <div class="p-3 bg-slate-100 border border-slate-200 rounded-xl text-center">
+              <span class="text-[10px] font-bold text-slate-700 uppercase block">Nomor Blok Unik</span>
+              <span id="previewCountBlocks" class="text-lg sm:text-xl font-black text-slate-900">0</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              Pratinjau Data (Maksimal 10 Baris Pertama):
+            </div>
+            <div class="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 font-extrabold sticky top-0 border-b border-slate-200">
+                  <tr>
+                    <th class="py-2 px-3 w-10 text-center">No</th>
+                    <th class="py-2 px-3 w-28">Nomor Blok</th>
+                    <th class="py-2 px-3">Nama Warga</th>
+                    <th class="py-2 px-3 w-32">Kategori</th>
+                  </tr>
+                </thead>
+                <tbody id="uploadPreviewTableBody" class="divide-y divide-slate-100">
+                  <!-- Render pratinjau -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-2 justify-between items-center shrink-0">
+          <button type="button" onclick="closeUploadPreviewModal()" class="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 transition">
+            Batalkan
+          </button>
+          <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button type="button" id="btnApplyAppend" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-800 transition">
+              ➕ Tambahkan ke Data Saat Ini
+            </button>
+            <button type="button" id="btnApplyReplaceAll" class="px-5 py-2 rounded-xl text-xs font-bold bg-brand-800 hover:bg-brand-900 text-white transition shadow-sm">
+              ✓ Gunakan File Ini Sekarang
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Panduan Format File -->
+    <div id="formatHelpModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+      <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div class="p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+          <h4 class="font-extrabold text-slate-800 text-base sm:text-lg">Format File yang Didukung</h4>
+          <button type="button" onclick="closeFormatHelpModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg p-1">&times;</button>
+        </div>
+        <div class="p-5 space-y-4 text-xs text-slate-600 leading-relaxed max-h-[75vh] overflow-y-auto">
+          <div>
+            <div class="font-black text-slate-900 mb-1">1. Format CSV (.csv)</div>
+            <p class="mb-1">Pemisah koma (,), titik koma (;), atau tab. Baris header otomatis dideteksi:</p>
+            <pre class="p-2.5 bg-slate-100 rounded-lg text-slate-800 font-mono text-[11px] overflow-x-auto">BLOK,NAMA
+B5/01,NGALI EKO
+B3/04,MUSTOFA
+B2/14,Rumah Kosong</pre>
+          </div>
+
+          <div>
+            <div class="font-black text-slate-900 mb-1">2. Format TXT (.txt)</div>
+            <p class="mb-1">Pemisah tanda strip (-), pipa (|), koma, atau tab:</p>
+            <pre class="p-2.5 bg-slate-100 rounded-lg text-slate-800 font-mono text-[11px] overflow-x-auto">B5/01 - NGALI EKO
+B3/04 - MUSTOFA
+B2/14 - Rumah Kosong</pre>
+          </div>
+
+          <div>
+            <div class="font-black text-slate-900 mb-1">3. Format PDF (.pdf) & Excel (.xlsx/.xls)</div>
+            <p>
+              Tabel atau baris teks dalam file PDF dan Excel akan diekstrak otomatis mencari pasangan nomor Blok dan Nama warga.
+            </p>
+          </div>
+
+          <div class="pt-2 flex flex-wrap gap-2">
+            <button type="button" onclick="downloadSampleCSV()" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-50 border border-brand-200 text-brand-900 hover:bg-brand-100 transition">
+              📥 Unduh Contoh CSV
+            </button>
+            <button type="button" onclick="downloadSampleTXT()" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 transition">
+              📥 Unduh Contoh TXT
+            </button>
+          </div>
+        </div>
+        <div class="p-4 border-t border-slate-100 bg-slate-50 text-right">
+          <button type="button" onclick="closeFormatHelpModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-800 hover:bg-brand-900 text-white transition">
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="no-print mt-12 text-center text-xs text-slate-400 py-6 border-t border-slate-200">
+      Sistem Generator Jadwal Ronda &copy; 2026 &bull; Dijalankan secara lokal (Offline Ready & Aman).
+    </footer>
+
+  </div>
+
+  <script>
+    // Konstanta & Status Aplikasi (Input Murni via File)
+    const MAX_PER_WEEK = 8;
+    const STORAGE_KEY = 'green_harmoni_residents_file_only_v2';
+    const FILENAME_KEY = 'green_harmoni_active_filename_v2';
+    
+    // Inisialisasi Data Warga dari Penyimpanan Lokal (Kosong sampai pengguna mengunggah file)
+    let residentsData = loadResidents();
+    let currentSchedule = [];
+    let pendingAction = null;
+    let currentSwapSource = null;
+    let tempParsedData = [];
+    let currentFileName = localStorage.getItem(FILENAME_KEY) || '';
+
+    function loadResidents() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        console.error("Gagal membaca storage:", e);
+      }
+      return [];
+    }
+
+    function saveResidents() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(residentsData));
+        if (currentFileName) {
+          localStorage.setItem(FILENAME_KEY, currentFileName);
+        } else {
+          localStorage.removeItem(FILENAME_KEY);
+        }
+      } catch (e) {
+        console.error("Gagal menyimpan ke storage:", e);
+      }
+      updateActiveFileInfo();
+    }
+
+    function updateActiveFileInfo() {
+      const badge = document.getElementById('activeFileBadge');
+      const text = document.getElementById('fileUploadPromptText');
+      if (!badge || !text) return;
+
+      if (residentsData.length > 0) {
+        badge.classList.remove('hidden');
+        badge.textContent = `✓ ${residentsData.length} Warga Terpasang`;
+        text.innerHTML = `File aktif: <strong class="text-brand-950 font-bold">${currentFileName || 'Daftar Warga'}</strong> (${residentsData.length} warga). Unggah file baru kapan saja untuk mengganti.`;
+      } else {
+        badge.classList.add('hidden');
+        text.textContent = 'Tarik & lepas file ke sini atau klik "Pilih File" untuk memasukkan daftar warga (Blok & Nama).';
+      }
+    }
+
+    // Perbarui label opsi putaran sesuai jumlah warga saat ini
+    function updateCycleOptions() {
+      const n = residentsData.length;
+      const weeksPerRound = n > 0 ? Math.ceil(n / MAX_PER_WEEK) : 12;
+      const opt1 = document.getElementById('optCycle1');
+      const opt2 = document.getElementById('optCycle2');
+      const opt3 = document.getElementById('optCycle3');
+
+      if (opt1) {
+        opt1.value = weeksPerRound;
+        opt1.textContent = `1 Putaran Penuh (${weeksPerRound} Minggu${n > 0 ? ' - ' + n + ' Warga' : ''})`;
+      }
+      if (opt2) {
+        opt2.value = weeksPerRound * 2;
+        opt2.textContent = `2 Putaran Penuh (${weeksPerRound * 2} Minggu)`;
+      }
+      if (opt3) {
+        opt3.value = weeksPerRound * 3;
+        opt3.textContent = `3 Putaran Penuh (${weeksPerRound * 3} Minggu)`;
+      }
+    }
+
+    // Format & Pembantu Tanggal Indonesia
+    const INDO_MONTHS = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    function formatIndoDate(date) {
+      const day = date.getDate();
+      const month = INDO_MONTHS[date.getMonth()];
+      const year = date.getFullYear();
+      return `Sabtu, ${day} ${month} ${year}`;
+    }
+
+    function getNextSaturday(fromDate = new Date()) {
+      const d = new Date(fromDate);
+      const day = d.getDay();
+      const diff = (6 - day + 7) % 7;
+      d.setDate(d.getDate() + diff);
+      return d;
+    }
+
+    function toISODate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    // Notifikasi Toast
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      const bgClass = type === 'error' ? 'bg-rose-600 text-white' : type === 'success' ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-white';
+      toast.className = `${bgClass} px-4 py-2.5 rounded-xl shadow-lg text-xs sm:text-sm font-bold flex items-center gap-2 transform transition-all duration-300 pointer-events-auto`;
+      toast.innerHTML = `<span>${type === 'error' ? '⚠️' : type === 'success' ? '✓' : 'ℹ️'}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-10px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    /**
+     * ALGORITMA PENJADWALAN ANTI-BENTROK DAN ANTI-MACET (DETERMINISTIK + ACAK)
+     * - Rumah Kosong dibagi rata (maksimal 2 per minggu).
+     * - Tidak ada nomor blok ganda dalam minggu yang sama.
+     * - Maksimal 8 orang per minggu.
+     */
+    function scheduleSingleRound(participants, numWeeks, maxPerWeek = 8) {
+      const isRumahKosong = p => p.nama.toLowerCase().includes('rumah kosong');
+
+      const blockFrequency = {};
+      participants.forEach(p => {
+        blockFrequency[p.blok] = (blockFrequency[p.blok] || 0) + 1;
+      });
+
+      const rkPoolOrig = participants.filter(isRumahKosong);
+      const wargaPoolOrig = participants.filter(p => !isRumahKosong(p));
+
+      // Loop pengacakan teruji (biasanya berhasil dalam 1-2 iterasi)
+      for (let attempt = 0; attempt < 250; attempt++) {
+        const rkPool = [...rkPoolOrig];
+        const wargaPool = [...wargaPoolOrig];
+
+        // Fisher-Yates acak
+        for (let i = rkPool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [rkPool[i], rkPool[j]] = [rkPool[j], rkPool[i]];
+        }
+        for (let i = wargaPool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [wargaPool[i], wargaPool[j]] = [wargaPool[j], wargaPool[i]];
+        }
+
+        // Prioritas penempatan: blok dengan kemunculan ganda didahulukan
+        rkPool.sort((a, b) => (blockFrequency[b.blok] || 1) - (blockFrequency[a.blok] || 1));
+        wargaPool.sort((a, b) => (blockFrequency[b.blok] || 1) - (blockFrequency[a.blok] || 1));
+
+        const weeks = Array.from({ length: numWeeks }, () => []);
+        const weekBlocks = Array.from({ length: numWeeks }, () => new Set());
+        const weekRkCount = Array.from({ length: numWeeks }, () => 0);
+
+        let possible = true;
+
+        // TAHAP 1: Distribusi Rumah Kosong
+        // Ketentuan Khusus: Minggu 11 (indeks 10) dan Minggu 12 (indeks 11) wajib mendapatkan tepat 2 Rumah Kosong
+        const targetRkCount = Array.from({ length: numWeeks }, (_, w) => {
+          if (numWeeks >= 12 && (w === 10 || w === 11)) {
+            return 2;
+          }
+          const extraRk = rkPool.length - (numWeeks >= 12 ? 4 : 0);
+          return (extraRk > (numWeeks >= 12 ? numWeeks - 2 : numWeeks)) ? 2 : 1;
+        });
+
+        for (const rk of rkPool) {
+          let candidates = [];
+          
+          // Prioritas 1: Isi Minggu 11 & Minggu 12 terlebih dahulu hingga kuota 2 terpenuhi
+          if (numWeeks >= 12) {
+            [10, 11].forEach(specW => {
+              if (specW < numWeeks && weekRkCount[specW] < 2 && !weekBlocks[specW].has(rk.blok) && weeks[specW].length < maxPerWeek) {
+                candidates.push(specW);
+              }
+            });
+          }
+
+          // Prioritas 2: Jika M11 & M12 sudah terisi 2 (atau bentrok blok), cari minggu lain yang masih di bawah target
+          if (candidates.length === 0) {
+            for (let w = 0; w < numWeeks; w++) {
+              if (weekRkCount[w] < targetRkCount[w] && !weekBlocks[w].has(rk.blok) && weeks[w].length < maxPerWeek) {
+                candidates.push(w);
+              }
+            }
+          }
+
+          // Prioritas 3 (Fallback cadangan): Pilih minggu yang masih memiliki slot < 2
+          if (candidates.length === 0) {
+            for (let w = 0; w < numWeeks; w++) {
+              if (weekRkCount[w] < 2 && !weekBlocks[w].has(rk.blok) && weeks[w].length < maxPerWeek) {
+                candidates.push(w);
+              }
+            }
+          }
+
+          if (candidates.length === 0) {
+            possible = false;
+            break;
+          }
+
+          let minRk = Infinity;
+          candidates.forEach(c => {
+            if (weekRkCount[c] < minRk) minRk = weekRkCount[c];
+          });
+          const bestCandidates = candidates.filter(c => weekRkCount[c] === minRk);
+          const chosen = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+
+          weeks[chosen].push(rk);
+          weekBlocks[chosen].add(rk.blok);
+          weekRkCount[chosen]++;
+        }
+
+        // Validasi Ketat: Jika terdapat minimal 4 Rumah Kosong dan periode >= 12 minggu,
+        // pastikan Minggu 11 dan Minggu 12 berhasil mendapatkan tepat 2 Rumah Kosong
+        if (possible && numWeeks >= 12 && rkPool.length >= 4) {
+          if (weekRkCount[10] < 2 || weekRkCount[11] < 2) {
+            continue; // Ulangi pengacakan jika syarat belum terpenuhi sempurna
+          }
+        }
+
+        if (!possible) continue;
+
+        // TAHAP 2: Isi slot dengan warga berpenghuni
+        for (const warga of wargaPool) {
+          const candidates = [];
+          for (let w = 0; w < numWeeks; w++) {
+            if (weeks[w].length < maxPerWeek && !weekBlocks[w].has(warga.blok)) {
+              candidates.push(w);
+            }
+          }
+
+          if (candidates.length === 0) {
+            possible = false;
+            break;
+          }
+
+          let minLen = Infinity;
+          candidates.forEach(c => {
+            if (weeks[c].length < minLen) minLen = weeks[c].length;
+          });
+          const bestCandidates = candidates.filter(c => weeks[c].length === minLen);
+          const chosen = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+
+          weeks[chosen].push(warga);
+          weekBlocks[chosen].add(warga.blok);
+        }
+
+        if (possible) {
+          return weeks;
+        }
+      }
+
+      return null;
+    }
+
+    /**
+     * GENERATOR JADWAL BERGILIR MULTI-PUTARAN
+     */
+    function generateFairSchedule(participants, targetWeeks) {
+      const weeksPerCycle = Math.ceil(participants.length / MAX_PER_WEEK); // 94 / 8 = 12 minggu
+      const fullSchedule = [];
+      let roundCount = 1;
+
+      while (fullSchedule.length < targetWeeks) {
+        let roundWeeks = null;
+        for (let tries = 0; tries < 5; tries++) {
+          roundWeeks = scheduleSingleRound(participants, weeksPerCycle, MAX_PER_WEEK);
+          if (roundWeeks) break;
+        }
+
+        if (!roundWeeks) {
+          throw new Error("Gagal mengalokasikan jadwal putaran. Silakan coba lagi.");
+        }
+
+        for (let w = 0; w < roundWeeks.length; w++) {
+          if (fullSchedule.length < targetWeeks) {
+            fullSchedule.push({
+              weekIndex: fullSchedule.length + 1,
+              round: roundCount,
+              participants: roundWeeks[w]
+            });
+          } else {
+            break;
+          }
+        }
+        roundCount++;
+      }
+
+      return fullSchedule;
+    }
+
+    /**
+     * VALIDASI INTEGRITAS JADWAL
+     */
+    function validateSchedule(schedule, participants) {
+      const errors = [];
+      const scheduledIds = new Set();
+      const turns = {};
+      participants.forEach(p => turns[p.id] = 0);
+
+      schedule.forEach(w => {
+        if (w.participants.length > MAX_PER_WEEK) {
+          errors.push(`Minggu ${w.weekIndex} melebihi batas 8 orang.`);
+        }
+
+        const rkCount = w.participants.filter(p => p.nama.toLowerCase().includes('rumah kosong')).length;
+        if (rkCount > 2) {
+          errors.push(`Minggu ${w.weekIndex} memiliki ${rkCount} Rumah Kosong (maksimal 2).`);
+        }
+
+        const seenBlocks = new Set();
+        w.participants.forEach(p => {
+          if (seenBlocks.has(p.blok)) {
+            errors.push(`Bentrok Blok di Minggu ${w.weekIndex}: Blok ${p.blok} ganda.`);
+          }
+          seenBlocks.add(p.blok);
+          scheduledIds.add(p.id);
+          turns[p.id] = (turns[p.id] || 0) + 1;
+        });
+      });
+
+      const turnVals = Object.values(turns);
+      const minTurn = turnVals.length > 0 ? Math.min(...turnVals) : 0;
+      const maxTurn = turnVals.length > 0 ? Math.max(...turnVals) : 0;
+
+      return {
+        isValid: errors.length === 0,
+        errors: errors,
+        scheduledCount: scheduledIds.size,
+        minTurn: minTurn,
+        maxTurn: maxTurn,
+        turns: turns
+      };
+    }
+
+    /**
+     * EKSEKUSI PEMBUATAN JADWAL (TOMBOL UTAMA)
+     */
+    function runGenerateSchedule(showSuccessToast = false) {
+      if (!residentsData || residentsData.length === 0) {
+        const container = document.getElementById('scheduleCardsContainer');
+        if (container) {
+          container.innerHTML = `
+            <div class="col-span-full py-16 px-6 bg-white rounded-2xl border-2 border-dashed border-slate-300 text-center flex flex-col items-center justify-center">
+              <div class="w-16 h-16 rounded-2xl bg-brand-50 text-brand-700 flex items-center justify-center text-3xl mb-3 shadow-inner">
+                📂
+              </div>
+              <h3 class="text-base sm:text-lg font-black text-slate-800 mb-1">Belum Ada Data Warga</h3>
+              <p class="text-xs sm:text-sm text-slate-500 max-w-md mb-5">
+                Silakan unggah file daftar warga Anda (format <strong>CSV, TXT, PDF, atau XLSX</strong>) menggunakan tombol di atas untuk mulai membuat jadwal ronda otomatis.
+              </p>
+              <button type="button" onclick="triggerFileUpload()" class="px-5 py-3 rounded-xl text-xs sm:text-sm font-bold bg-brand-700 hover:bg-brand-800 text-white transition shadow-sm cursor-pointer flex items-center gap-2">
+                <span>📤</span> Unggah File Sekarang
+              </button>
+            </div>
+          `;
+        }
+        document.getElementById('statScheduledCount').textContent = `0 / 0 Warga`;
+        document.getElementById('statWeeksCount').textContent = `0 Minggu`;
+        document.getElementById('statTurnBalance').textContent = `-`;
+        renderRekapTable({});
+        if (showSuccessToast) {
+          showToast("Silakan unggah file daftar warga terlebih dahulu.", "info");
+        }
+        return;
+      }
+
+      const startDateVal = document.getElementById('startDateInput').value;
+      let baseDate = new Date();
+      if (startDateVal) {
+        const parts = startDateVal.split('-');
+        baseDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+
+      if (baseDate.getDay() !== 6) {
+        baseDate = getNextSaturday(baseDate);
+        document.getElementById('startDateInput').value = toISODate(baseDate);
+      }
+
+      const defaultWeeksPerCycle = Math.ceil(residentsData.length / MAX_PER_WEEK);
+      const periodSelect = document.getElementById('periodSelect').value;
+      let targetWeeks = defaultWeeksPerCycle;
+      if (periodSelect === 'custom') {
+        targetWeeks = parseInt(document.getElementById('customPeriodInput').value, 10) || defaultWeeksPerCycle;
+      } else if (periodSelect === '12') {
+        targetWeeks = defaultWeeksPerCycle;
+      } else if (periodSelect === '24') {
+        targetWeeks = defaultWeeksPerCycle * 2;
+      } else if (periodSelect === '36') {
+        targetWeeks = defaultWeeksPerCycle * 3;
+      }
+
+      if (targetWeeks < 1) targetWeeks = 1;
+
+      try {
+        const rawSchedule = generateFairSchedule(residentsData, targetWeeks);
+        
+        currentSchedule = rawSchedule.map((w, idx) => {
+          const wDate = new Date(baseDate);
+          wDate.setDate(baseDate.getDate() + (idx * 7));
+          return {
+            ...w,
+            date: wDate,
+            dateString: formatIndoDate(wDate)
+          };
+        });
+
+        const validation = validateSchedule(currentSchedule, residentsData);
+
+        renderMetrics(validation);
+        renderScheduleCards(currentSchedule);
+        renderRekapTable(validation.turns);
+
+        const subTitle = document.getElementById('printSubTitle');
+        if (subTitle && currentSchedule.length > 0) {
+          subTitle.textContent = `Periode: ${currentSchedule[0].dateString} s/d ${currentSchedule[currentSchedule.length - 1].dateString} (${currentSchedule.length} Minggu Ronda)`;
+        }
+
+        if (showSuccessToast) {
+          showToast(`Berhasil mengacak jadwal ${currentSchedule.length} minggu ronda baru!`, "success");
+        }
+
+      } catch (err) {
+        showToast("Terjadi kendala: " + err.message, "error");
+      }
+    }
+
+    function renderMetrics(validation) {
+      const badge = document.getElementById('statConflictBadge');
+      if (validation.isValid) {
+        badge.className = "mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300";
+        badge.textContent = "✓ 0 BENTROK (VALID)";
+      } else {
+        badge.className = "mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-100 text-rose-800 border border-rose-300";
+        badge.textContent = "⚠️ ADA BENTROK";
+      }
+
+      document.getElementById('statScheduledCount').textContent = `${validation.scheduledCount} / ${residentsData.length} Warga`;
+      document.getElementById('statWeeksCount').textContent = `${currentSchedule.length} Minggu`;
+      document.getElementById('statTurnBalance').textContent = `${validation.minTurn} - ${validation.maxTurn}x / Warga`;
+    }
+
+    function renderScheduleCards(schedule) {
+      const container = document.getElementById('scheduleCardsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      schedule.forEach(week => {
+        const uniqueBlocks = new Set(week.participants.map(p => p.blok)).size;
+        const isConflict = uniqueBlocks !== week.participants.length;
+        const rkCount = week.participants.filter(p => p.nama.toLowerCase().includes('rumah kosong')).length;
+        const isRkExceeded = rkCount > 2;
+
+        let rowsHtml = '';
+        week.participants.forEach((p, idx) => {
+          const isRumahKosong = p.nama.toLowerCase().includes('rumah kosong');
+          rowsHtml += `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-100 last:border-b-0">
+              <td class="py-2.5 px-3 text-center text-xs font-bold text-slate-400 w-8">${idx + 1}</td>
+              <td class="py-2.5 px-3 font-extrabold text-brand-900 text-xs sm:text-sm tracking-wide w-24">${p.blok}</td>
+              <td class="py-2.5 px-3 font-semibold text-xs sm:text-sm ${isRumahKosong ? 'text-slate-400 italic' : 'text-slate-800'}">
+                ${p.nama}
+                ${isRumahKosong ? '<span class="ml-1.5 inline-block px-1.5 py-0.5 text-[10px] font-normal not-italic rounded bg-slate-100 text-slate-500 border border-slate-200">Kosong</span>' : ''}
+              </td>
+              <td class="py-2 px-2 text-center no-print">
+                <div class="inline-flex items-center gap-1">
+                  <button type="button" onclick="openSwapModal(${week.weekIndex}, ${idx})" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-brand-100 text-brand-900 font-bold text-[11px] transition" title="Tukar jadwal warga ini">
+                    ⇄ Tukar
+                  </button>
+                  <button type="button" onclick="askRemoveParticipantFromWeek(${week.weekIndex}, ${idx})" class="p-1 px-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] transition" title="Hapus warga ini dari minggu ini">
+                    ✕
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        });
+
+        const card = document.createElement('div');
+        card.className = "page-break-avoid bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition";
+        card.innerHTML = `
+          <div class="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/70 flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] font-black uppercase tracking-wider text-brand-700">JADWAL RONDA &bull; PUTARAN ${week.round}</span>
+                <button type="button" onclick="askRemoveWeek(${week.weekIndex})" class="no-print text-slate-400 hover:text-rose-600 text-xs font-bold transition" title="Hapus seluruh minggu ini dari jadwal">
+                  🗑️
+                </button>
+              </div>
+              <h2 class="text-base sm:text-lg font-black text-slate-900">MINGGU ${week.weekIndex}</h2>
+              <div class="text-xs font-semibold text-slate-500 mt-0.5">${week.dateString}</div>
+            </div>
+            <div class="flex flex-col items-end gap-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${isConflict || isRkExceeded ? 'bg-rose-100 text-rose-800' : 'bg-brand-100 text-brand-800 border border-brand-200'}">
+                ${isConflict ? 'BENTROK' : isRkExceeded ? '>2 KOSONG' : '✓ VALID'}
+              </span>
+              <span class="text-[11px] font-extrabold text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-full">
+                ${week.participants.length} Org (${uniqueBlocks} Blok &bull; ${rkCount} Kosong)
+              </span>
+            </div>
+          </div>
+          <div class="p-2 sm:p-3 flex-1 overflow-x-auto">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                  <th class="py-1.5 px-3 text-center">No</th>
+                  <th class="py-1.5 px-3">Blok</th>
+                  <th class="py-1.5 px-3">Nama Warga</th>
+                  <th class="py-1.5 px-2 text-center no-print w-24">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderRekapTable(turns) {
+      const tbody = document.getElementById('rekapTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (!residentsData || residentsData.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-8 text-center text-slate-400 text-xs">
+              Belum ada data warga yang diunggah.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      const personWeeks = {};
+      residentsData.forEach(p => personWeeks[p.id] = []);
+
+      currentSchedule.forEach(w => {
+        w.participants.forEach(p => {
+          if (personWeeks[p.id]) {
+            personWeeks[p.id].push(w.weekIndex);
+          }
+        });
+      });
+
+      residentsData.forEach((p, idx) => {
+        const turnCount = (turns && turns[p.id]) !== undefined ? turns[p.id] : 0;
+        const weeksList = personWeeks[p.id].length > 0 ? personWeeks[p.id].map(w => `M-${w}`).join(', ') : '-';
+        const isRumahKosong = p.nama.toLowerCase().includes('rumah kosong');
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100 last:border-b-0';
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 text-center text-xs font-bold text-slate-400">${idx + 1}</td>
+          <td class="py-2.5 px-4 font-black text-brand-900 text-xs sm:text-sm">${p.blok}</td>
+          <td class="py-2.5 px-4 font-semibold text-xs sm:text-sm ${isRumahKosong ? 'text-slate-400 italic' : 'text-slate-800'}">
+            ${p.nama} ${isRumahKosong ? '<span class="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-slate-100 text-slate-500 border border-slate-200">Kosong</span>' : ''}
+          </td>
+          <td class="py-2.5 px-4 text-center">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800">${turnCount}x</span>
+          </td>
+          <td class="py-2.5 px-4 text-xs font-semibold text-slate-600">${weeksList}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Modal Konfirmasi Hapus Warga dari Jadwal
+    const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+    const deleteConfirmText = document.getElementById('deleteConfirmText');
+
+    function askRemoveParticipantFromWeek(weekIndex, participantIdx) {
+      const week = currentSchedule.find(w => w.weekIndex === weekIndex);
+      if (!week || !week.participants[participantIdx]) return;
+      const p = week.participants[participantIdx];
+
+      pendingAction = {
+        type: 'REMOVE_FROM_WEEK',
+        weekIndex: weekIndex,
+        participantIdx: participantIdx
+      };
+      deleteConfirmText.textContent = `Hapus ${p.blok} (${p.nama}) dari jadwal Minggu ${weekIndex}?`;
+      deleteConfirmModal.classList.remove('hidden');
+    }
+
+    function askRemoveWeek(weekIndex) {
+      pendingAction = {
+        type: 'REMOVE_WEEK',
+        weekIndex: weekIndex
+      };
+      deleteConfirmText.textContent = `Hapus seluruh jadwal ronda Minggu ke-${weekIndex}?`;
+      deleteConfirmModal.classList.remove('hidden');
+    }
+
+    document.getElementById('btnConfirmDelete').addEventListener('click', () => {
+      if (!pendingAction) return;
+
+      if (pendingAction.type === 'REMOVE_FROM_WEEK') {
+        const { weekIndex, participantIdx } = pendingAction;
+        const week = currentSchedule.find(w => w.weekIndex === weekIndex);
+        if (week) {
+          const removed = week.participants.splice(participantIdx, 1)[0];
+          const validation = validateSchedule(currentSchedule, residentsData);
+          renderMetrics(validation);
+          renderScheduleCards(currentSchedule);
+          renderRekapTable(validation.turns);
+          showToast(`Warga ${removed.blok} dihapus dari Minggu ${weekIndex}!`, "info");
+        }
+      }
+      else if (pendingAction.type === 'REMOVE_WEEK') {
+        const { weekIndex } = pendingAction;
+        currentSchedule = currentSchedule.filter(w => w.weekIndex !== weekIndex);
+        currentSchedule.forEach((w, i) => {
+          w.weekIndex = i + 1;
+        });
+        const validation = validateSchedule(currentSchedule, residentsData);
+        renderMetrics(validation);
+        renderScheduleCards(currentSchedule);
+        renderRekapTable(validation.turns);
+        showToast(`Minggu ke-${weekIndex} berhasil dihapus dari jadwal!`, "info");
+      }
+
+      pendingAction = null;
+      deleteConfirmModal.classList.add('hidden');
+    });
+
+    document.getElementById('btnCancelDelete').addEventListener('click', () => {
+      pendingAction = null;
+      deleteConfirmModal.classList.add('hidden');
+    });
+
+    // Fitur Tukar / Ganti Jadwal Ronda Antar Minggu
+    function openSwapModal(weekIndex, participantIdx) {
+      const sourceWeek = currentSchedule.find(w => w.weekIndex === weekIndex);
+      if (!sourceWeek || !sourceWeek.participants[participantIdx]) return;
+      const sourceP = sourceWeek.participants[participantIdx];
+
+      currentSwapSource = { weekIndex, participantIdx, participant: sourceP };
+
+      document.getElementById('swapSourceResident').textContent = `${sourceP.blok} — ${sourceP.nama}`;
+      document.getElementById('swapSourceWeekBadge').textContent = `Minggu ${weekIndex}`;
+
+      const select = document.getElementById('swapTargetSelect');
+      select.innerHTML = '';
+
+      currentSchedule.forEach(w => {
+        if (w.weekIndex !== weekIndex) {
+          w.participants.forEach((p, pIdx) => {
+            const opt = document.createElement('option');
+            opt.value = `${w.weekIndex}:${pIdx}`;
+            opt.textContent = `[Minggu ${w.weekIndex}] ${p.blok} — ${p.nama}`;
+            select.appendChild(opt);
+          });
+        }
+      });
+
+      document.getElementById('swapScheduleModal').classList.remove('hidden');
+    }
+
+    function closeSwapModal() {
+      currentSwapSource = null;
+      document.getElementById('swapScheduleModal').classList.add('hidden');
+    }
+
+    document.getElementById('btnCloseSwapModal').addEventListener('click', closeSwapModal);
+    document.getElementById('btnCancelSwap').addEventListener('click', closeSwapModal);
+
+    document.getElementById('btnConfirmSwap').addEventListener('click', function() {
+      if (!currentSwapSource) return;
+      const targetVal = document.getElementById('swapTargetSelect').value;
+      if (!targetVal) return;
+
+      const [targetWeekIdxStr, targetPIdxStr] = targetVal.split(':');
+      const targetWeekIndex = parseInt(targetWeekIdxStr, 10);
+      const targetPIdx = parseInt(targetPIdxStr, 10);
+
+      const sWeek = currentSchedule.find(w => w.weekIndex === currentSwapSource.weekIndex);
+      const tWeek = currentSchedule.find(w => w.weekIndex === targetWeekIndex);
+
+      if (!sWeek || !tWeek) return;
+
+      const sP = sWeek.participants[currentSwapSource.participantIdx];
+      const tP = tWeek.participants[targetPIdx];
+
+      // Tukar posisi
+      sWeek.participants[currentSwapSource.participantIdx] = tP;
+      tWeek.participants[targetPIdx] = sP;
+
+      closeSwapModal();
+
+      const validation = validateSchedule(currentSchedule, residentsData);
+      renderMetrics(validation);
+      renderScheduleCards(currentSchedule);
+      renderRekapTable(validation.turns);
+
+      if (!validation.isValid) {
+        showToast("Perhatian: Terjadi bentrok blok setelah penukaran ini!", "error");
+      } else {
+        showToast(`Berhasil menukar ${sP.blok} dengan ${tP.blok}!`, "success");
+      }
+    });
+
+    /**
+     * MODUL PARSER FILE (CSV, TXT, PDF, EXCEL)
+     */
+    function triggerFileUpload() {
+      const input = document.getElementById('globalFileInput');
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+    }
+
+    function openFormatHelpModal() {
+      document.getElementById('formatHelpModal').classList.remove('hidden');
+    }
+
+    function closeFormatHelpModal() {
+      document.getElementById('formatHelpModal').classList.add('hidden');
+    }
+
+    function closeUploadPreviewModal() {
+      tempParsedData = [];
+      document.getElementById('uploadPreviewModal').classList.add('hidden');
+    }
+
+    // Unduh Template Format CSV
+    function downloadSampleCSV() {
+      const sample = "BLOK,NAMA\nB5/01,NGALI EKO\nB3/04,MUSTOFA\nB2/13,RUSLI\nB2/14,Rumah Kosong\nB4/23,JAROT\nB5/08,IRWANSYAH\nB2/23,MISRAN\nB2/15,Rumah Kosong\n";
+      const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Contoh_Daftar_Warga_Ronda.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // Unduh Template Format TXT
+    function downloadSampleTXT() {
+      const sample = "B5/01 - NGALI EKO\nB3/04 - MUSTOFA\nB2/13 - RUSLI\nB2/14 - Rumah Kosong\nB4/23 - JAROT\nB5/08 - IRWANSYAH\nB2/23 - MISRAN\nB2/15 - Rumah Kosong\n";
+      const blob = new Blob([sample], { type: 'text/plain;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Contoh_Daftar_Warga_Ronda.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // Parsing String CSV / TXT
+    function parseCSVorTXT(text) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length === 0) throw new Error("File kosong atau tidak memiliki baris data.");
+
+      const parsed = [];
+      for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        if (raw.startsWith('#') || raw.startsWith('//')) continue;
+
+        let parts = [];
+        if (raw.includes('\t')) {
+          parts = raw.split('\t');
+        } else if (raw.includes(';')) {
+          parts = raw.split(';');
+        } else if (raw.includes('|')) {
+          parts = raw.split('|');
+        } else if (raw.includes(' - ')) {
+          parts = raw.split(' - ');
+        } else if (raw.includes(',')) {
+          parts = raw.split(',');
+        } else {
+          parts = raw.split(/\s{2,}/);
+        }
+
+        parts = parts.map(p => p.trim().replace(/^["']|["']$/g, '')).filter(p => p.length > 0);
+        if (parts.length < 2) continue;
+
+        // Buang nomor urut di awal jika ada (contoh: "1, B5/01, NGALI")
+        if (parts.length >= 3 && /^\d+$/.test(parts[0])) {
+          parts.shift();
+        }
+
+        let colA = parts[0];
+        let colB = parts[1];
+
+        // Lewati baris judul kolom
+        const isHeader = (colA.toLowerCase().includes('blok') && colB.toLowerCase().includes('nama')) ||
+                         (colB.toLowerCase().includes('blok') && colA.toLowerCase().includes('nama'));
+        if (isHeader) continue;
+
+        let blok = colA;
+        let nama = colB;
+
+        // Tukar jika kolom kedua yang berformat blok
+        if (!blok.includes('/') && (colB.includes('/') || /^[A-Z]\d+/i.test(colB))) {
+          blok = colB;
+          nama = colA;
+        }
+
+        blok = blok.toUpperCase().trim();
+        nama = nama.toUpperCase().trim();
+
+        if (!blok || !nama) continue;
+        if (nama.toLowerCase().includes('rumah kosong') || nama === '-' || nama === 'KOSONG') {
+          nama = 'Rumah Kosong';
+        }
+
+        parsed.push({ blok, nama });
+      }
+
+      if (parsed.length === 0) {
+        throw new Error("Gagal membaca pasangan nomor Blok dan Nama warga dari file ini. Pastikan format sesuai contoh.");
+      }
+      return parsed;
+    }
+
+    // Parsing Excel (XLSX / XLS)
+    function parseExcel(arrayBuffer) {
+      if (typeof XLSX === 'undefined') throw new Error("Library SheetJS Excel belum siap dimuat.");
+      const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      if (!rows || rows.length === 0) throw new Error("Sheet Excel tidak memiliki data.");
+
+      let blokCol = -1;
+      let namaCol = -1;
+      let startRow = 0;
+
+      for (let r = 0; r < Math.min(rows.length, 10); r++) {
+        const row = rows[r];
+        if (!Array.isArray(row)) continue;
+        for (let c = 0; c < row.length; c++) {
+          const val = String(row[c] || '').trim().toLowerCase();
+          if (val === 'blok' || val.includes('blok')) blokCol = c;
+          if (val === 'nama' || val.includes('nama')) namaCol = c;
+        }
+        if (blokCol !== -1 && namaCol !== -1) {
+          startRow = r + 1;
+          break;
+        }
+      }
+
+      if (blokCol === -1 || namaCol === -1) {
+        blokCol = 0;
+        namaCol = 1;
+        startRow = 0;
+      }
+
+      const parsed = [];
+      for (let r = startRow; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || !row[blokCol]) continue;
+
+        let blok = String(row[blokCol] || '').trim().toUpperCase();
+        let nama = String(row[namaCol] || '').trim().toUpperCase();
+
+        if (!blok) continue;
+        if (!nama || nama.toLowerCase().includes('rumah kosong') || nama === '-' || nama === 'KOSONG') {
+          nama = 'Rumah Kosong';
+        }
+
+        parsed.push({ blok, nama });
+      }
+
+      if (parsed.length === 0) {
+        throw new Error("Tidak ada data warga yang berhasil dibaca dari sheet Excel ini.");
+      }
+      return parsed;
+    }
+
+    // Parsing PDF Menggunakan PDF.js
+    async function parsePDF(arrayBuffer) {
+      if (typeof pdfjsLib === 'undefined') throw new Error("Library PDF.js belum siap dimuat.");
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdfDoc = await loadingTask.promise;
+      const textLines = [];
+
+      for (let p = 1; p <= pdfDoc.numPages; p++) {
+        const page = await pdfDoc.getPage(p);
+        const textContent = await page.getTextContent();
+        const items = textContent.items;
+        if (!items || items.length === 0) continue;
+
+        // Kelompokkan teks berdasarkan koordinat Y (toleransi baris 4px)
+        const rowMap = new Map();
+        items.forEach(it => {
+          const yKey = Math.round(it.transform[5] / 4) * 4;
+          if (!rowMap.has(yKey)) rowMap.set(yKey, []);
+          rowMap.get(yKey).push({ x: it.transform[4], str: it.str });
+        });
+
+        const sortedY = Array.from(rowMap.keys()).sort((a, b) => b - a);
+        sortedY.forEach(y => {
+          const lineItems = rowMap.get(y).sort((a, b) => a.x - b.x);
+          const fullLine = lineItems.map(i => i.str).join('   ').trim();
+          if (fullLine.length > 0) textLines.push(fullLine);
+        });
+      }
+
+      if (textLines.length === 0) {
+        throw new Error("Tidak ada teks atau tabel yang dapat diekstrak dari file PDF ini.");
+      }
+      return parseCSVorTXT(textLines.join('\n'));
+    }
+
+    // Handler Utama Pemrosesan File
+    async function processUploadedFile(file) {
+      if (!file) return;
+      const ext = file.name.split('.').pop().toLowerCase();
+      showToast(`Membaca file "${file.name}"...`, "info");
+
+      try {
+        let parsed = [];
+        if (ext === 'csv' || ext === 'txt') {
+          const text = await file.text();
+          parsed = parseCSVorTXT(text);
+        } else if (ext === 'xlsx' || ext === 'xls') {
+          const buf = await file.arrayBuffer();
+          parsed = parseExcel(buf);
+        } else if (ext === 'pdf') {
+          const buf = await file.arrayBuffer();
+          parsed = await parsePDF(buf);
+        } else {
+          throw new Error(`Format file .${ext} belum didukung. Gunakan .csv, .txt, .pdf, atau .xlsx.`);
+        }
+
+        openUploadPreviewModal(parsed, file.name);
+
+      } catch (err) {
+        console.error("Gagal parse file:", err);
+        showToast("Gagal memproses file: " + err.message, "error");
+      }
+    }
+
+    function openUploadPreviewModal(parsedList, fileName) {
+      tempParsedData = parsedList;
+
+      const titleEl = document.getElementById('uploadPreviewFileName');
+      titleEl.textContent = `Nama File: ${fileName} (${parsedList.length} baris terbaca)`;
+      titleEl.dataset.filename = fileName;
+      
+      const emptyCount = parsedList.filter(p => p.nama.toLowerCase().includes('rumah kosong')).length;
+      const uniqueBlocks = new Set(parsedList.map(p => p.blok)).size;
+
+      document.getElementById('previewCountTotal').textContent = parsedList.length;
+      document.getElementById('previewCountEmpty').textContent = emptyCount;
+      document.getElementById('previewCountBlocks').textContent = uniqueBlocks;
+
+      const tbody = document.getElementById('uploadPreviewTableBody');
+      tbody.innerHTML = '';
+
+      const previewRows = parsedList.slice(0, 10);
+      previewRows.forEach((p, idx) => {
+        const isKosong = p.nama.toLowerCase().includes('rumah kosong');
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100 last:border-b-0';
+        tr.innerHTML = `
+          <td class="py-2 px-3 text-center text-slate-400 font-bold">${idx + 1}</td>
+          <td class="py-2 px-3 font-black text-brand-900">${p.blok}</td>
+          <td class="py-2 px-3 font-semibold ${isKosong ? 'text-slate-400 italic' : 'text-slate-800'}">${p.nama}</td>
+          <td class="py-2 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isKosong ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}">
+              ${isKosong ? 'Rumah Kosong' : 'Warga'}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('uploadPreviewModal').classList.remove('hidden');
+    }
+
+    // Terapkan Ganti Semua Data Warga dari File
+    document.getElementById('btnApplyReplaceAll').addEventListener('click', function() {
+      if (!tempParsedData || tempParsedData.length === 0) return;
+
+      residentsData = tempParsedData.map((p, idx) => ({
+        id: idx + 1,
+        blok: p.blok,
+        nama: p.nama
+      }));
+      currentFileName = document.getElementById('uploadPreviewFileName').dataset.filename || 'Daftar Warga';
+
+      saveResidents();
+      updateCycleOptions();
+      runGenerateSchedule(false);
+
+      showToast(`Berhasil memuat ${residentsData.length} data warga dari file!`, "success");
+      closeUploadPreviewModal();
+    });
+
+    // Terapkan Penggabungan Data Warga
+    document.getElementById('btnApplyAppend').addEventListener('click', function() {
+      if (!tempParsedData || tempParsedData.length === 0) return;
+
+      let maxId = residentsData.length > 0 ? Math.max(...residentsData.map(p => p.id)) : 0;
+      const appended = tempParsedData.map((p) => {
+        maxId++;
+        return {
+          id: maxId,
+          blok: p.blok,
+          nama: p.nama
+        };
+      });
+
+      residentsData = residentsData.concat(appended);
+      currentFileName = `Gabungan (${residentsData.length} Warga)`;
+      saveResidents();
+      updateCycleOptions();
+      runGenerateSchedule(false);
+
+      showToast(`Berhasil menambahkan ${appended.length} warga baru (Total: ${residentsData.length} Warga)!`, "success");
+      closeUploadPreviewModal();
+    });
+
+    // Setup Event Listener File Input & Drag and Drop
+    document.getElementById('globalFileInput').addEventListener('change', function(e) {
+      if (this.files && this.files.length > 0) {
+        processUploadedFile(this.files[0]);
+      }
+    });
+
+    function setupDragAndDrop(elementId) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        el.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          el.classList.add('border-brand-600', 'bg-brand-100/60');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        el.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          el.classList.remove('border-brand-600', 'bg-brand-100/60');
+        });
+      });
+
+      el.addEventListener('drop', (e) => {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          processUploadedFile(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    // Daftarkan fungsi helper upload ke global window
+    window.triggerFileUpload = triggerFileUpload;
+    window.openFormatHelpModal = openFormatHelpModal;
+    window.closeFormatHelpModal = closeFormatHelpModal;
+    window.closeUploadPreviewModal = closeUploadPreviewModal;
+    window.downloadSampleCSV = downloadSampleCSV;
+    window.downloadSampleTXT = downloadSampleTXT;
+
+    // Ekspor Excel Multi-Sheet
+    document.getElementById('btnExportExcel').addEventListener('click', function() {
+      if (!currentSchedule || currentSchedule.length === 0) {
+        showToast("Jadwal belum tersedia untuk diekspor.", "error");
+        return;
+      }
+
+      if (typeof XLSX === 'undefined') {
+        showToast("Library Excel sedang memuat, silakan coba beberapa detik lagi.", "error");
+        return;
+      }
+
+      const s1 = [
+        ["JADWAL RONDA MALAM"],
+        [`Periode: ${currentSchedule[0].dateString} s/d ${currentSchedule[currentSchedule.length - 1].dateString}`],
+        [],
+        ["Minggu Ke", "Tanggal", "No Urut", "Nomor Blok", "Nama Warga", "Kategori"]
+      ];
+
+      currentSchedule.forEach(w => {
+        w.participants.forEach((p, idx) => {
+          s1.push([
+            `Minggu ${w.weekIndex}`,
+            w.dateString,
+            idx + 1,
+            p.blok,
+            p.nama,
+            p.nama.toLowerCase().includes('rumah kosong') ? 'Rumah Kosong' : 'Warga'
+          ]);
+        });
+      });
+
+      const validation = validateSchedule(currentSchedule, residentsData);
+      const personWeeks = {};
+      residentsData.forEach(p => personWeeks[p.id] = []);
+      currentSchedule.forEach(w => {
+        w.participants.forEach(p => {
+          if (personWeeks[p.id]) personWeeks[p.id].push(`Minggu ${w.weekIndex}`);
+        });
+      });
+
+      const s2 = [
+        ["REKAPITULASI GILIRAN RONDA WARGA"],
+        [],
+        ["No", "Nomor Blok", "Nama Warga", "Total Giliran", "Daftar Minggu Bertugas"]
+      ];
+
+      residentsData.forEach((p, idx) => {
+        s2.push([
+          idx + 1,
+          p.blok,
+          p.nama,
+          validation.turns[p.id] || 0,
+          personWeeks[p.id].join(', ')
+        ]);
+      });
+
+      const s3 = [
+        ["DATA MASTER WARGA"],
+        [],
+        ["No", "Nomor Blok", "Nama Warga", "Keterangan"]
+      ];
+
+      residentsData.forEach((p, idx) => {
+        s3.push([
+          idx + 1,
+          p.blok,
+          p.nama,
+          p.nama.toLowerCase().includes('rumah kosong') ? 'Rumah Kosong' : 'Warga Berpenghuni'
+        ]);
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws1 = XLSX.utils.aoa_to_sheet(s1);
+      const ws2 = XLSX.utils.aoa_to_sheet(s2);
+      const ws3 = XLSX.utils.aoa_to_sheet(s3);
+
+      XLSX.utils.book_append_sheet(wb, ws1, "Jadwal Lengkap");
+      XLSX.utils.book_append_sheet(wb, ws2, "Rekap Giliran Warga");
+      XLSX.utils.book_append_sheet(wb, ws3, "Master Blok & Nama");
+
+      XLSX.writeFile(wb, `Jadwal_Ronda_${Date.now()}.xlsx`);
+      showToast("File Excel (3 Sheet) berhasil diunduh!", "success");
+    });
+
+    // Ekspor CSV (Lengkap dan tertutup sempurna)
+    document.getElementById('btnExportCSV').addEventListener('click', function() {
+      if (!currentSchedule || currentSchedule.length === 0) {
+        showToast("Jadwal belum tersedia untuk diekspor.", "error");
+        return;
+      }
+
+      let csv = "\uFEFFMinggu,Tanggal,No,Blok,Nama\n";
+      currentSchedule.forEach(w => {
+        w.participants.forEach((p, idx) => {
+          csv += `"${w.weekIndex}","${w.dateString}","${idx + 1}","${p.blok}","${p.nama}"\n`;
+        });
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Jadwal_Ronda_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("File CSV berhasil diunduh!", "success");
+    });
+
+    /**
+     * GENERATOR PDF VEKTOR LANDSCAPE (ANTI-KOSONG & 100% PASTI TERISI)
+     * Menggambar elemen PDF secara terprogram dengan koordinat presisi A4 Landscape (297mm x 210mm).
+     * 12 minggu ronda tersusun rapi dalam grid 4 kolom x 3 baris dalam 1 halaman.
+     */
+    function generateVectorPDF() {
+      if (!currentSchedule || currentSchedule.length === 0) {
+        showToast("Jadwal belum dibuat. Silakan acak jadwal terlebih dahulu.", "error");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf || {};
+      if (!jsPDF) {
+        showToast("Membuka dialog cetak browser...", "info");
+        window.print();
+        return;
+      }
+
+      const btnPdf = document.getElementById('btnDownloadPDF');
+      const btnText = document.getElementById('btnPdfText');
+
+      btnPdf.disabled = true;
+      btnText.textContent = "⏳ Membuat PDF...";
+      showToast("Sedang membuat file PDF Landscape...", "info");
+
+      try {
+        const doc = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4',
+          compress: true
+        });
+
+        const WEEKS_PER_PAGE = 12;
+        const totalPages = Math.ceil(currentSchedule.length / WEEKS_PER_PAGE);
+
+        for (let page = 0; page < totalPages; page++) {
+          if (page > 0) {
+            doc.addPage('a4', 'landscape');
+          }
+
+          const pageWeeks = currentSchedule.slice(page * WEEKS_PER_PAGE, (page + 1) * WEEKS_PER_PAGE);
+          const startPeriod = pageWeeks[0].dateString;
+          const endPeriod = pageWeeks[pageWeeks.length - 1].dateString;
+
+          // 1. KOP / HEADER HALAMAN
+          // Garis aksen hijau atas
+          doc.setFillColor(20, 83, 45); // #14532d
+          doc.rect(10, 6, 277, 2, 'F');
+
+          // Judul Utama
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(13);
+          doc.setTextColor(20, 83, 45);
+          doc.text("JADWAL RONDA MALAM", 10, 14);
+
+          // Subjudul Periode
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(71, 85, 105);
+          doc.text(`Periode: ${startPeriod} s/d ${endPeriod}   |   Maksimal 8 Peserta/Sabtu   |   Putaran ke-${pageWeeks[0].round}`, 10, 18.5);
+
+          // Badge Status (Kanan Atas)
+          doc.setFillColor(220, 252, 231); // #dcfce7
+          doc.setDrawColor(134, 239, 172); // #86efac
+          doc.roundedRect(223, 9, 64, 8.5, 1.5, 1.5, 'FD');
+          
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7.5);
+          doc.setTextColor(21, 128, 61);
+          doc.text("✓ 100% BEBAS BENTROK BLOK", 255, 13.2, { align: 'center' });
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text(`Halaman ${page + 1} dari ${totalPages}`, 255, 16.2, { align: 'center' });
+
+          // Garis pemisah header
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.3);
+          doc.line(10, 20.5, 287, 20.5);
+
+          // 2. KISI KARTU JADWAL (4 Kolom x 3 Baris)
+          const startX = 10;
+          const startY = 23;
+          const cardW = 66.5;
+          const cardH = 56.5;
+          const gapX = 3.6;
+          const gapY = 3.5;
+
+          pageWeeks.forEach((week, i) => {
+            const col = i % 4;
+            const row = Math.floor(i / 4);
+            const cardX = startX + col * (cardW + gapX);
+            const cardY = startY + row * (cardH + gapY);
+
+            const rkCount = week.participants.filter(p => p.nama.toLowerCase().includes('rumah kosong')).length;
+
+            // Kotak Luar Kartu
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(203, 213, 225);
+            doc.setLineWidth(0.25);
+            doc.roundedRect(cardX, cardY, cardW, cardH, 2, 2, 'FD');
+
+            // Header Kartu
+            doc.setFillColor(241, 245, 249);
+            doc.roundedRect(cardX, cardY, cardW, 8.5, 2, 2, 'F');
+            doc.rect(cardX, cardY + 5, cardW, 3.5, 'F'); // meratakan sudut bawah
+            doc.setDrawColor(203, 213, 225);
+            doc.line(cardX, cardY + 8.5, cardX + cardW, cardY + 8.5);
+
+            // Teks Minggu
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8.5);
+            doc.setTextColor(20, 83, 45);
+            doc.text(`MINGGU ${week.weekIndex}`, cardX + 2.5, cardY + 4.2);
+
+            // Tanggal
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(6.2);
+            doc.setTextColor(100, 116, 139);
+            const shortDate = week.dateString.replace('Sabtu, ', '');
+            doc.text(shortDate, cardX + 2.5, cardY + 7.3);
+
+            // Badge Jumlah & Kosong
+            doc.setFillColor(220, 252, 231);
+            doc.setDrawColor(187, 247, 208);
+            doc.roundedRect(cardX + cardW - 24, cardY + 1.8, 22, 5, 1, 1, 'FD');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(5.8);
+            doc.setTextColor(21, 128, 61);
+            doc.text(`${week.participants.length} Org (${rkCount} Kosong)`, cardX + cardW - 13, cardY + 5.2, { align: 'center' });
+
+            // Judul Kolom Tabel
+            doc.setFillColor(248, 250, 252);
+            doc.rect(cardX, cardY + 8.5, cardW, 4, 'F');
+            doc.line(cardX, cardY + 12.5, cardX + cardW, cardY + 12.5);
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(5.8);
+            doc.setTextColor(100, 116, 139);
+            doc.text("NO", cardX + 2.5, cardY + 11.3);
+            doc.text("BLOK", cardX + 8.5, cardY + 11.3);
+            doc.text("NAMA PESERTA", cardX + 23.5, cardY + 11.3);
+
+            // Baris Peserta (Maksimal 8 Baris)
+            const rowH = 4.8;
+            const startRowY = cardY + 12.5;
+
+            for (let r = 0; r < 8; r++) {
+              const p = week.participants[r];
+              const curRowY = startRowY + r * rowH;
+
+              // Warna selang-seling baris
+              if (r % 2 === 1) {
+                doc.setFillColor(250, 250, 252);
+                doc.rect(cardX, curRowY, cardW, rowH, 'F');
+              }
+
+              // Garis pemisah antar baris
+              if (r < 7) {
+                doc.setDrawColor(241, 245, 249);
+                doc.line(cardX, curRowY + rowH, cardX + cardW, curRowY + rowH);
+              }
+
+              if (p) {
+                const isKosong = p.nama.toLowerCase().includes('rumah kosong');
+
+                // Kolom No
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(6);
+                doc.setTextColor(148, 163, 184);
+                doc.text(String(r + 1), cardX + 4.2, curRowY + 3.4, { align: 'center' });
+
+                // Kolom Blok
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(6.5);
+                doc.setTextColor(20, 83, 45);
+                doc.text(p.blok, cardX + 8.5, curRowY + 3.4);
+
+                // Kolom Nama
+                if (isKosong) {
+                  doc.setFont('helvetica', 'italic');
+                  doc.setFontSize(6);
+                  doc.setTextColor(148, 163, 184);
+                  doc.text("Rumah Kosong", cardX + 23.5, curRowY + 3.4);
+                } else {
+                  doc.setFont('helvetica', 'bold');
+                  doc.setFontSize(6.2);
+                  doc.setTextColor(30, 41, 59);
+                  let displayName = p.nama;
+                  if (displayName.length > 20) {
+                    displayName = displayName.substring(0, 19) + '…';
+                  }
+                  doc.text(displayName, cardX + 23.5, curRowY + 3.4);
+                }
+              }
+            }
+          });
+
+          // 3. FOOTER HALAMAN
+          doc.setDrawColor(226, 232, 240);
+          doc.line(10, 203.5, 287, 203.5);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6.5);
+          doc.setTextColor(148, 163, 184);
+          doc.text("Generator Jadwal Ronda • Pemerataan Giliran Ronda Warga & 100% Bebas Bentrok Nomor Blok", 10, 207);
+          const printDateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          doc.text(`Dicetak: ${printDateStr}`, 287, 207, { align: 'right' });
+        }
+
+        doc.save(`Jadwal_Ronda_Landscape_${Date.now()}.pdf`);
+        showToast("File PDF Landscape (1 Halaman Muat 12 Minggu) Berhasil Diunduh!", "success");
+
+      } catch (err) {
+        console.error("Gagal membuat PDF vektor:", err);
+        showToast("Terjadi kendala pembuatan PDF, membuka dialog cetak...", "error");
+        window.print();
+      } finally {
+        btnPdf.disabled = false;
+        btnText.textContent = "📥 Unduh PDF";
+      }
+    }
+
+    // Sambungkan tombol unduh PDF ke generator vektor
+    document.getElementById('btnDownloadPDF').addEventListener('click', generateVectorPDF);
+
+    document.getElementById('btnPrint').addEventListener('click', () => window.print());
+
+    document.getElementById('rekapSearchInput').addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      const rows = document.querySelectorAll('#rekapTableBody tr');
+      rows.forEach(r => {
+        r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+
+    // Navigasi Tabs
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        tabBtns.forEach(b => {
+          b.classList.remove('bg-white', 'text-brand-900', 'shadow-sm');
+          b.classList.add('text-slate-600');
+        });
+        document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+
+        this.classList.remove('text-slate-600');
+        this.classList.add('bg-white', 'text-brand-900', 'shadow-sm');
+        
+        const targetId = this.getAttribute('data-target');
+        document.getElementById(targetId).classList.remove('hidden');
+      });
+    });
+
+    // Pilihan Periode
+    const periodSelect = document.getElementById('periodSelect');
+    const customPeriodInput = document.getElementById('customPeriodInput');
+    periodSelect.addEventListener('change', function() {
+      if (this.value === 'custom') {
+        customPeriodInput.classList.remove('hidden');
+        customPeriodInput.value = 12;
+      } else {
+        customPeriodInput.classList.add('hidden');
+      }
+    });
+
+    // Tanggal Mulai
+    const dateInput = document.getElementById('startDateInput');
+    dateInput.addEventListener('change', function() {
+      const parts = this.value.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        if (d.getDay() !== 6) {
+          const nearestSat = getNextSaturday(d);
+          this.value = toISODate(nearestSat);
+          document.getElementById('startDateFeedback').textContent = "⚠️ Tanggal otomatis disesuaikan ke hari Sabtu terdekat.";
+          document.getElementById('startDateFeedback').className = "text-xs text-amber-600 font-semibold mt-1.5";
+        } else {
+          document.getElementById('startDateFeedback').textContent = "✓ Sesuai (Hari Sabtu)";
+          document.getElementById('startDateFeedback').className = "text-xs text-emerald-600 font-semibold mt-1.5";
+        }
+      }
+    });
+
+    // Daftarkan fungsi ke window global untuk tombol onclick inline
+    window.askRemoveParticipantFromWeek = askRemoveParticipantFromWeek;
+    window.askRemoveWeek = askRemoveWeek;
+    window.openSwapModal = openSwapModal;
+
+    // EVENT LISTENER TOMBOL AUTO ACAK
+    document.getElementById('btnAutoAcak').addEventListener('click', function() {
+      runGenerateSchedule(true);
+    });
+
+    // Inisialisasi awal saat halaman dibuka
+    window.addEventListener('DOMContentLoaded', () => {
+      const defaultSat = getNextSaturday(new Date());
+      dateInput.value = toISODate(defaultSat);
+      setupDragAndDrop('topDropZone');
+      updateActiveFileInfo();
+      updateCycleOptions();
+      runGenerateSchedule(false);
+    });
+  </script>
+</body>
+</html>
